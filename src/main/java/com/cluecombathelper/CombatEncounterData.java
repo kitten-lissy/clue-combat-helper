@@ -57,6 +57,57 @@ public enum CombatEncounterData {
             true
     ),
 
+    // Elite coordinate clues - outside wilderness (random: Armadylean OR Bandosian)
+    ELITE_GUARD(
+            "Armadylean OR Bandosian Guard",
+            125,
+            "Elite",
+            "Coordinate (non-wildy)",
+            "Armadylean: Protect from Missiles | Bandosian: Protect from Melee",
+            "Bring ranged gear (Armadylean flies — CAN'T melee it!)",
+            "Food",
+            "Random spawn! Armadylean (ranged only, max 10) or Bandosian (melee, max 13). Bring a crossbow just in case.",
+            false
+    ),
+
+    // Elite coordinate - specific spawns
+    ARMADYLEAN_GUARD(
+            "Armadylean Guard",
+            97,
+            "Elite",
+            "Coordinate",
+            "Protect from Missiles (blocks all damage)",
+            "Ranged or magic gear (CAN'T melee — it flies!)",
+            "Food",
+            "Flies! Must use ranged/magic/halberd. Pray Missiles = zero damage. Max hit 10.",
+            false
+    ),
+
+    BANDOSIAN_GUARD(
+            "Bandosian Guard",
+            125,
+            "Elite",
+            "Coordinate",
+            "Protect from Melee (blocks all damage)",
+            "Best melee gear",
+            "Food",
+            "Melee only. Pray Melee = zero damage. Max hit 13.",
+            false
+    ),
+
+    // Elite coordinate clues - wilderness
+    ELITE_GUARD_WILDY(
+            "Armadylean OR Bandosian Guard",
+            125,
+            "Elite",
+            "Coordinate (wilderness)",
+            "Armadylean: Protect from Missiles | Bandosian: Protect from Melee",
+            "Black d'hide, crossbow (Armadylean flies — CAN'T melee!)",
+            "Food, Clue box, 1-click teleport (below 30 Wildy)",
+            "Random spawn! Bring crossbow for Armadylean. Bring clue box! Watch for PKers.",
+            true
+    ),
+
     // Master emote clues
     DOUBLE_AGENT_MASTER(
             "Double Agent",
@@ -70,7 +121,20 @@ public enum CombatEncounterData {
             false
     ),
 
-    // Master coordinate clues - single combat area
+    // Master coordinate - preparing (not at location yet)
+    MASTER_COORDINATE(
+            "Brassican Mage OR Ancient Wizards",
+            140,
+            "Master",
+            "Coordinate (non-wildy)",
+            "Brassican: Prayer DOESN'T work! | Ancients: Protect from Melee",
+            "Best melee gear + bring Antipoison",
+            "Plenty of food, Antipoison (Ancient melee wizard poisons through prayer!)",
+            "Brassican: just DPS. Ancient Wizards: DDS spec melee first (poisons!), then mage, then ranger. Switch prayers each.",
+            false
+    ),
+
+    // Master coordinate - single combat (Brassican Mage confirmed)
     BRASSICAN_MAGE(
             "Brassican Mage",
             140,
@@ -83,7 +147,7 @@ public enum CombatEncounterData {
             false
     ),
 
-    // Master coordinate clues - multicombat area
+    // Master coordinate - multicombat (Ancient Wizards confirmed)
     ANCIENT_WIZARDS(
             "Ancient Wizards (x3)",
             112,
@@ -92,33 +156,20 @@ public enum CombatEncounterData {
             "Protect from Melee (melee one hits hardest + poisons)",
             "Best melee gear, high Defence",
             "Food, Antipoison (melee wizard poisons through prayer!)",
-            "3 wizards: Melee (max 36, poisons!), Mage (max 18), Ranger (max 23). Kill melee first!",
+            "DDS spec the melee wizard first (poisons!), then mage, then ranger. Switch prayers each kill.",
             false
     ),
 
-    // Master coordinate clues - wilderness (Brassican)
-    BRASSICAN_MAGE_WILDY(
-            "Brassican Mage",
+    // Master coordinate - wilderness (always show OR since risky to linger)
+    MASTER_COORDINATE_WILDY(
+            "Brassican Mage OR Ancient Wizards",
             140,
             "Master",
-            "Coordinate (wilderness, single combat)",
-            "Prayer does NOT work (typeless damage)",
-            "Black d'hide, d scim",
-            "Food, 1-click teleport",
-            "Typeless magic ignores prayers. Low Defence, just DPS it. Bring clue box! Watch for PKers.",
-            true
-    ),
-
-    // Master coordinate clues - wilderness (Ancient Wizards)
-    ANCIENT_WIZARDS_WILDY(
-            "Ancient Wizards (x3)",
-            112,
-            "Master",
-            "Coordinate (wilderness, multicombat)",
-            "Protect from Melee",
+            "Coordinate (wilderness)",
+            "Brassican: Prayer DOESN'T work! | Ancients: Protect from Melee",
             "Black d'hide, d scim",
             "Food, Antipoison, Clue box, 1-click teleport",
-            "Melee wizard poisons through prayer! Kill melee first. Bring clue box! Watch for PKers.",
+            "Brassican: just DPS. Ancients: DDS spec melee first (poisons!), then mage, then ranger. Bring clue box! Watch for PKers.",
             true
     );
 
