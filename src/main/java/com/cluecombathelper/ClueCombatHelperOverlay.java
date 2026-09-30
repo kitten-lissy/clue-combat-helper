@@ -18,7 +18,6 @@ public class ClueCombatHelperOverlay extends Overlay {
     // Pink shades for different lines
     private static final Color TITLE_PINK = new Color(255, 105, 180);       // Hot pink - title
     private static final Color MONSTER_PINK = new Color(255, 182, 193);     // Light pink - monster name
-    private static final Color PRAYER_PINK = new Color(255, 140, 170);      // Medium pink - prayer
     private static final Color GEAR_PINK = new Color(255, 160, 200);        // Soft pink - gear
     private static final Color BRING_PINK = new Color(255, 200, 220);       // Pale pink - bring items
     private static final Color TIP_PINK = new Color(255, 220, 230);         // Lightest pink - tips
@@ -76,14 +75,6 @@ public class ClueCombatHelperOverlay extends Overlay {
         panelComponent.getChildren().add(LineComponent.builder()
                 .left(encounter.getClueTier() + " - " + encounter.getTriggerType())
                 .leftColor(LABEL_TEAL)
-                .build());
-
-        // Prayer
-        panelComponent.getChildren().add(LineComponent.builder()
-                .left("Prayer:")
-                .leftColor(LABEL_TEAL)
-                .right(encounter.getPrayer())
-                .rightColor(PRAYER_PINK)
                 .build());
 
         // Gear
