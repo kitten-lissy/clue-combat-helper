@@ -1,12 +1,17 @@
 package com.cluecombathelper;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import net.runelite.client.plugins.cluescrolls.clues.ClueScroll;
 import net.runelite.client.plugins.cluescrolls.clues.CoordinateClue;
 import net.runelite.client.plugins.cluescrolls.clues.EmoteClue;
 import net.runelite.client.plugins.cluescrolls.clues.Enemy;
 import net.runelite.client.plugins.cluescrolls.clues.HotColdClue;
+import net.runelite.client.plugins.cluescrolls.clues.hotcold.HotColdLocation;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -59,6 +64,107 @@ public class EncounterDetectionTest {
         assertEquals(CombatEncounterData.DOUBLE_AGENT_HARD_WILDY, ClueCombatHelperPlugin.encounterFor(Enemy.DOUBLE_AGENT_65, true));
         assertEquals(CombatEncounterData.DOUBLE_AGENT_HARD, ClueCombatHelperPlugin.encounterFor(Enemy.DOUBLE_AGENT_108, false));
         assertEquals(CombatEncounterData.DOUBLE_AGENT_MASTER, ClueCombatHelperPlugin.encounterFor(Enemy.DOUBLE_AGENT_141, false));
+    }
+
+    @Test
+    public void doubleAgentLevelsMatchTheWiki() {
+        // Wiki: level 108 outside the Wilderness, 65 inside, 141 on master clues
+        assertEquals("108", ClueCombatHelperPlugin.encounterFor(Enemy.DOUBLE_AGENT_108, false).getLevelText());
+        assertEquals("65", ClueCombatHelperPlugin.encounterFor(Enemy.DOUBLE_AGENT_65, true).getLevelText());
+        assertEquals("141", ClueCombatHelperPlugin.encounterFor(Enemy.DOUBLE_AGENT_141, false).getLevelText());
+        assertFalse(ClueCombatHelperPlugin.encounterFor(Enemy.DOUBLE_AGENT_108, false).isWilderness());
+        assertTrue(ClueCombatHelperPlugin.encounterFor(Enemy.DOUBLE_AGENT_65, true).isWilderness());
+        assertTrue(CombatEncounterData.DOUBLE_AGENT_HARD.getTip().contains("Max hit 14"));
+        assertTrue(CombatEncounterData.DOUBLE_AGENT_HARD_WILDY.getTip().contains("Max hit 5"));
+    }
+
+    private static List<HotColdLocation> masterLocations() {
+        List<HotColdLocation> result = new ArrayList<>();
+        for (HotColdLocation location : HotColdLocation.values()) {
+            if (!location.isBeginnerClue()) {
+                result.add(location);
+            }
+        }
+        return result;
+    }
+
+    @Test
+    public void hotColdEnemyFollowsPossibleSpots() {
+        // Every master spot has an enemy in RuneLite's data
+        for (HotColdLocation location : masterLocations()) {
+            assertNotNull(location.name(), location.getEnemy());
+        }
+
+        // Before the device narrows things down it could be either enemy
+        assertEquals(Enemy.BRASSICAN_OR_WIZARDS, ClueCombatHelperPlugin.enemyForHotCold(masterLocations()));
+
+        // One spot left: that spot's enemy
+        assertEquals(Enemy.ANCIENT_WIZARDS, ClueCombatHelperPlugin.enemyForHotCold(
+                Arrays.asList(HotColdLocation.WILDERNESS_5)));
+        assertEquals(Enemy.BRASSICAN_MAGE, ClueCombatHelperPlugin.enemyForHotCold(
+                Arrays.asList(HotColdLocation.MISTHALIN_DRAYNOR_BANK, HotColdLocation.MISTHALIN_LUMBER_YARD)));
+
+        // Spots that disagree fall back to the either/or entry
+        assertEquals(Enemy.BRASSICAN_OR_WIZARDS, ClueCombatHelperPlugin.enemyForHotCold(
+                Arrays.asList(HotColdLocation.WILDERNESS_5, HotColdLocation.WILDERNESS_27)));
+    }
+
+    @Test
+    public void hotColdEncounterUsesSpecificEntries() {
+        assertEquals(CombatEncounterData.ANCIENT_WIZARDS, ClueCombatHelperPlugin.encounterFor(
+                ClueCombatHelperPlugin.enemyForHotCold(Arrays.asList(HotColdLocation.ZEAH_LIZARDMAN)), false));
+        assertEquals(CombatEncounterData.MASTER_COORDINATE_WILDY, ClueCombatHelperPlugin.encounterFor(
+                ClueCombatHelperPlugin.enemyForHotCold(Arrays.asList(HotColdLocation.WILDERNESS_5, HotColdLocation.WILDERNESS_27)), true));
+    }
+
+    @Test
+    public void hotColdWildernessSpotsAreFlagged() {
+        for (HotColdLocation location : masterLocations()) {
+            boolean named = location.name().startsWith("WILDERNESS_");
+            assertEquals(location.name(), named, ClueCombatHelperPlugin.isWilderness(location.getWorldPoint()));
+        }
+        assertTrue(ClueCombatHelperPlugin.allInWilderness(
+                Arrays.asList(HotColdLocation.WILDERNESS_5, HotColdLocation.WILDERNESS_54)));
+        assertFalse(ClueCombatHelperPlugin.allInWilderness(
+                Arrays.asList(HotColdLocation.WILDERNESS_5, HotColdLocation.MISTHALIN_DRAYNOR_BANK)));
+        assertTrue(ClueCombatHelperPlugin.anyInWilderness(
+                Arrays.asList(HotColdLocation.WILDERNESS_5, HotColdLocation.MISTHALIN_DRAYNOR_BANK)));
+        assertFalse(ClueCombatHelperPlugin.allInWilderness(new ArrayList<HotColdLocation>()));
+    }
+
+    @Test
+    public void spawnedEnemyNarrowsEitherOrEntries() {
+        assertEquals(CombatEncounterData.ARMADYLEAN_GUARD,
+                ClueCombatHelperPlugin.specificEncounterForNpc(CombatEncounterData.ELITE_GUARD, "Armadylean guard"));
+        assertEquals(CombatEncounterData.BANDOSIAN_GUARD,
+                ClueCombatHelperPlugin.specificEncounterForNpc(CombatEncounterData.ELITE_GUARD_WILDY, "Bandosian guard"));
+        assertEquals(CombatEncounterData.ANCIENT_WIZARDS,
+                ClueCombatHelperPlugin.specificEncounterForNpc(CombatEncounterData.MASTER_COORDINATE, "Ancient Wizard"));
+        assertEquals(CombatEncounterData.SARADOMIN_WIZARD,
+                ClueCombatHelperPlugin.specificEncounterForNpc(CombatEncounterData.SARADOMIN_WIZARD, "Saradomin wizard"));
+    }
+
+    @Test
+    public void everyEncounterHasTextAndFollowsTheRules() {
+        for (CombatEncounterData data : CombatEncounterData.values()) {
+            if (data == CombatEncounterData.UNKNOWN) {
+                continue;
+            }
+            for (String text : new String[]{data.getMonsterName(), data.getLevelText(), data.getGear(), data.getBring(), data.getTip()}) {
+                assertFalse(data.name(), text.isEmpty());
+                // Overlay font has no arrow glyph
+                assertFalse(data.name(), text.contains("\u2192"));
+                // No prayer advice (Plugin Hub rule)
+                assertFalse(data.name() + ": " + text, text.toLowerCase(Locale.ROOT).contains("pray"));
+            }
+            assertTrue(data.name(), data.getNpcNames().length > 0);
+        }
+    }
+
+    @Test
+    public void unknownEnemyHasFallbackEntry() {
+        assertEquals(CombatEncounterData.UNKNOWN.getGear(), "");
+        assertNull(ClueCombatHelperPlugin.encounterFor(null, false));
     }
 
     @Test

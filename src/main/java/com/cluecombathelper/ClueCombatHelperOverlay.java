@@ -1,104 +1,210 @@
 package com.cluecombathelper;
 
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.Graphics2D;
+import java.util.ArrayList;
+import java.util.List;
+import javax.inject.Inject;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayPosition;
-import net.runelite.client.ui.overlay.OverlayPriority;
 import net.runelite.client.ui.overlay.components.LineComponent;
 import net.runelite.client.ui.overlay.components.PanelComponent;
 import net.runelite.client.ui.overlay.components.TitleComponent;
 
-import javax.inject.Inject;
-import java.awt.*;
-
 public class ClueCombatHelperOverlay extends Overlay {
 
-    // Teal background
-    private static final Color BACKGROUND_TEAL = new Color(0, 80, 80, 200);
+    static final String DIG_AGAIN = "Enemy down. Dig again to get the clue.";
+    static final String TALK_TO_URI = "Enemy down. Talk to Uri with the clue items equipped. "
+            + "If he didn't appear, re-equip them and emote again.";
+    static final String DEVICE_DAMAGE = "Each Feel of the strange device costs 3-8 HP. Bring extra food.";
 
-    // Pink shades for different lines
-    private static final Color TITLE_PINK = new Color(255, 105, 180);       // Hot pink - title
-    private static final Color MONSTER_PINK = new Color(255, 182, 193);     // Light pink - monster name
-    private static final Color GEAR_PINK = new Color(255, 160, 200);        // Soft pink - gear
-    private static final Color BRING_PINK = new Color(255, 200, 220);       // Pale pink - bring items
-    private static final Color TIP_PINK = new Color(255, 220, 230);         // Lightest pink - tips
-    private static final Color LABEL_TEAL = new Color(100, 220, 220);       // Light teal - labels
-
-    // Wilderness warning
-    private static final Color WILDERNESS_RED = new Color(255, 50, 50);
+    private static final int PANEL_WIDTH = 280;
 
     private final ClueCombatHelperPlugin plugin;
+    private final ClueCombatHelperConfig config;
     private final PanelComponent panelComponent = new PanelComponent();
 
     @Inject
-    public ClueCombatHelperOverlay(ClueCombatHelperPlugin plugin) {
+    public ClueCombatHelperOverlay(ClueCombatHelperPlugin plugin, ClueCombatHelperConfig config) {
         this.plugin = plugin;
+        this.config = config;
         setPosition(OverlayPosition.BOTTOM_LEFT);
-        setPriority(OverlayPriority.HIGH);
+        setPriority(Overlay.PRIORITY_HIGH);
     }
 
     @Override
     public Dimension render(Graphics2D graphics) {
         CombatEncounterData encounter = plugin.getCurrentEncounter();
-        if (encounter == null) {
+        if (encounter == null || !config.showOverlay()) {
+            return null;
+        }
+
+        boolean dangerZone = plugin.isWildernessStep() || plugin.isPlayerInWilderness() || plugin.isPvpWorld();
+        if (config.wildernessOnly() && !dangerZone) {
             return null;
         }
 
         panelComponent.getChildren().clear();
-        panelComponent.setPreferredSize(new Dimension(280, 0));
-        panelComponent.setBackgroundColor(BACKGROUND_TEAL);
+        panelComponent.setPreferredSize(new Dimension(PANEL_WIDTH, 0));
+        panelComponent.setBackgroundColor(config.backgroundColor());
 
-        // Title
+        // After the kill: one line telling the player what to do next
+        if (plugin.isEnemyKilled() && config.afterKillReminder()) {
+            String reminder = plugin.getStepKind() == ClueCombatHelperPlugin.StepKind.EMOTE ? TALK_TO_URI : DIG_AGAIN;
+            addText(reminder, config.titleColor());
+            return panelComponent.render(graphics);
+        }
+
+        if (!shouldShowPanel()) {
+            return null;
+        }
+
+        boolean compact = config.compactMode();
+        Color warning = config.warningColor();
+
+        // Title: the enemy itself
         panelComponent.getChildren().add(TitleComponent.builder()
-                .text("Clue Combat Guide")
-                .color(TITLE_PINK)
+                .text(plugin.getDisplayName() == null ? "Clue Combat Guide" : plugin.getDisplayName())
+                .color(config.titleColor())
                 .build());
 
-        // Wilderness warning
-        if (encounter.isWilderness()) {
+        // Level + clue info
+        String level = encounter.getLevelText();
+        String clueInfo = clueInfo(encounter);
+        if (!level.isEmpty() || (!compact && !clueInfo.isEmpty())) {
             panelComponent.getChildren().add(LineComponent.builder()
-                    .left("WILDERNESS")
-                    .leftColor(WILDERNESS_RED)
-                    .right("Risk your gear!")
-                    .rightColor(WILDERNESS_RED)
+                    .left(level.isEmpty() ? "" : "Level " + level)
+                    .leftColor(config.monsterColor())
+                    .right(compact ? "" : clueInfo)
+                    .rightColor(config.labelColor())
                     .build());
         }
 
-        // Monster name + level
-        panelComponent.getChildren().add(LineComponent.builder()
-                .left(encounter.getMonsterName())
-                .leftColor(MONSTER_PINK)
-                .right("Level " + encounter.getCombatLevel())
-                .rightColor(MONSTER_PINK)
-                .build());
+        // Wilderness / PvP warning
+        if (config.showWildernessWarning()) {
+            if (plugin.isWildernessStep() || plugin.isPlayerInWilderness()) {
+                addPair("WILDERNESS", "Risk your gear!", warning);
+            } else if (plugin.isPvpWorld()) {
+                addPair("PVP WORLD", "Risk your gear!", warning);
+            } else if (plugin.isMaybeWilderness()) {
+                addText("Some possible spots are in the Wilderness.", warning);
+            }
+        }
 
-        // Clue info
-        panelComponent.getChildren().add(LineComponent.builder()
-                .left(encounter.getClueTier() + " - " + encounter.getTriggerType())
-                .leftColor(LABEL_TEAL)
-                .build());
+        // Armadylean guard weapon reach
+        if (config.weaponReachWarning()) {
+            if (plugin.isWeaponWarning()) {
+                addText("Your weapon can't hit the Armadylean guard (it flies). "
+                        + "Use ranged, magic, a halberd or a salamander.", warning);
+            } else if (plugin.isNoFlyerWeaponWarning()) {
+                addText("No ranged, magic, halberd or salamander weapon found. "
+                        + "If the Armadylean guard spawns, most melee can't hit it.", warning);
+            }
+        }
+
+        // Master hot/cold: the device itself hurts
+        if (plugin.getStepKind() == ClueCombatHelperPlugin.StepKind.HOT_COLD) {
+            if (!compact) {
+                addText(DEVICE_DAMAGE, config.bringColor());
+            }
+            if (config.lowHpWarning() && plugin.isLowHp()) {
+                addText("Low HP. Eat before using the device again.", warning);
+            }
+        }
 
         // Gear
-        panelComponent.getChildren().add(LineComponent.builder()
-                .left("Gear:")
-                .leftColor(LABEL_TEAL)
-                .right(encounter.getGear())
-                .rightColor(GEAR_PINK)
-                .build());
+        if (!encounter.getGear().isEmpty()) {
+            if (!compact) {
+                addText("Gear:", config.labelColor());
+            }
+            addText(encounter.getGear(), config.gearColor());
+        }
+
+        if (compact) {
+            return panelComponent.render(graphics);
+        }
 
         // Bring
-        panelComponent.getChildren().add(LineComponent.builder()
-                .left("Bring:")
-                .leftColor(LABEL_TEAL)
-                .right(encounter.getBring())
-                .rightColor(BRING_PINK)
-                .build());
+        if (config.showBring() && !encounter.getBring().isEmpty()) {
+            addText("Bring:", config.labelColor());
+            addText(encounter.getBring(), config.bringColor());
+            if (config.checkInventory()) {
+                addInventoryCheck(encounter, warning);
+            }
+        }
 
         // Tip
-        panelComponent.getChildren().add(LineComponent.builder()
-                .left(encounter.getTip())
-                .leftColor(TIP_PINK)
-                .build());
+        if (config.showTips() && !encounter.getTip().isEmpty()) {
+            addText(encounter.getTip(), config.tipColor());
+        }
 
         return panelComponent.render(graphics);
+    }
+
+    private boolean shouldShowPanel() {
+        if (plugin.isEnemySpawned()) {
+            return true;
+        }
+        switch (config.showMode()) {
+            case NEAR_SPOT:
+                return plugin.isNearSpot();
+            case AFTER_SPAWN:
+                return false;
+            case ALWAYS:
+            default:
+                return true;
+        }
+    }
+
+    private String clueInfo(CombatEncounterData encounter) {
+        String trigger = plugin.getTriggerLabel();
+        if (encounter.getClueTier().isEmpty() || trigger == null || trigger.isEmpty()) {
+            return encounter.getClueTier();
+        }
+        return encounter.getClueTier() + " - " + trigger;
+    }
+
+    private void addInventoryCheck(CombatEncounterData encounter, Color warning) {
+        List<String> have = new ArrayList<>();
+        List<String> missing = new ArrayList<>();
+
+        int food = plugin.getFoodCount();
+        if (food > 0) {
+            have.add(food + " food");
+        } else {
+            missing.add("food");
+        }
+
+        if (encounter.needsAntipoison()) {
+            (plugin.hasAntipoison() ? have : missing).add("antipoison");
+        }
+
+        if (plugin.isWildernessStep() || encounter.isWilderness()) {
+            (plugin.hasWildernessTeleport() ? have : missing).add("level 30 teleport");
+        }
+
+        if (!have.isEmpty()) {
+            addText("Have: " + String.join(", ", have), config.bringColor());
+        }
+        if (!missing.isEmpty()) {
+            addText("Missing: " + String.join(", ", missing), warning);
+        }
+    }
+
+    private void addText(String text, Color color) {
+        panelComponent.getChildren().add(LineComponent.builder()
+                .left(text)
+                .leftColor(color)
+                .build());
+    }
+
+    private void addPair(String left, String right, Color color) {
+        panelComponent.getChildren().add(LineComponent.builder()
+                .left(left)
+                .leftColor(color)
+                .right(right)
+                .rightColor(color)
+                .build());
     }
 }
